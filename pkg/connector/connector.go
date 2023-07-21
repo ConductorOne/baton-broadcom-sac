@@ -3,38 +3,77 @@ package connector
 import (
 	"context"
 	"fmt"
+	"io"
 
+	sac "github.com/ConductorOne/baton-broadcom-sac/pkg/sac"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
-// TODO: implement your connector here
-type connectorImpl struct {
+type Connector struct {
+	client   *sac.Client
+	username string
+	password string
+	tenant   string
 }
 
-func (c *connectorImpl) ListResourceTypes(ctx context.Context, req *v2.ResourceTypesServiceListResourceTypesRequest) (*v2.ResourceTypesServiceListResourceTypesResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+// ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
+func (c *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
+	return []connectorbuilder.ResourceSyncer{
+		newAccountBuilder(c.client),
+		newUserBuilder(c.client),
+		newGroupBuilder(c.client),
+	}
 }
 
-func (c *connectorImpl) ListResources(ctx context.Context, req *v2.ResourcesServiceListResourcesRequest) (*v2.ResourcesServiceListResourcesResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+// Asset takes an input AssetRef and attempts to fetch it using the connector's authenticated http client
+// It streams a response, always starting with a metadata object, following by chunked payloads for the asset.
+func (c *Connector) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.ReadCloser, error) {
+	return "", nil, nil
 }
 
-func (c *connectorImpl) ListEntitlements(ctx context.Context, req *v2.EntitlementsServiceListEntitlementsRequest) (*v2.EntitlementsServiceListEntitlementsResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+// Metadata returns metadata about the connector.
+func (c *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
+	return &v2.ConnectorMetadata{
+		DisplayName: "Broadcom SAC",
+		Description: "Connector syncing users and groups from Broadcom SAC.",
+	}, nil
 }
 
-func (c *connectorImpl) ListGrants(ctx context.Context, req *v2.GrantsServiceListGrantsRequest) (*v2.GrantsServiceListGrantsResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+// Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
+// to be sure that they are valid.
+func (c *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+	token, err := sac.CreateBearerToken(ctx, c.username, c.password, c.tenant)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get access token: %w", err)
+	}
+
+	if token == "" {
+		return nil, fmt.Errorf("missing access token")
+	}
+
+	return nil, nil
 }
 
-func (c *connectorImpl) GetMetadata(ctx context.Context, req *v2.ConnectorServiceGetMetadataRequest) (*v2.ConnectorServiceGetMetadataResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
+// New returns a new instance of the connector.
+func New(ctx context.Context, username, password, tenant string) (*Connector, error) {
+	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
+	if err != nil {
+		return nil, err
+	}
 
-func (c *connectorImpl) Validate(ctx context.Context, req *v2.ConnectorServiceValidateRequest) (*v2.ConnectorServiceValidateResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
+	token, err := sac.CreateBearerToken(ctx, username, password, tenant)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get access token: %w", err)
+	}
 
-func (c *connectorImpl) GetAsset(req *v2.AssetServiceGetAssetRequest, server v2.AssetService_GetAssetServer) error {
-	return fmt.Errorf("not implemented")
+	return &Connector{
+		client:   sac.NewClient(httpClient, tenant, token),
+		username: username,
+		password: password,
+		tenant:   tenant,
+	}, nil
 }
