@@ -3,7 +3,7 @@ package connector
 import (
 	"context"
 
-	sac "github.com/ConductorOne/baton-broadcom-sac/pkg/sac"
+	sac "github.com/conductorone/baton-broadcom-sac/pkg/sac"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
