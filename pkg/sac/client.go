@@ -1,0 +1,254 @@
+package sac
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+)
+
+type Client struct {
+	httpClient *http.Client
+	baseUrl    string
+	token      string
+}
+
+func NewClient(httpClient *http.Client, tenant, token string) *Client {
+	baseUrl := fmt.Sprintf("api.%s.luminatesec.com", tenant)
+	return &Client{
+		httpClient: httpClient,
+		baseUrl:    baseUrl,
+		token:      token,
+	}
+}
+
+type AuthResponse struct {
+	AccessToken      string `json:"access_token"`
+	ExpiresIn        int    `json:"expires_in"`
+	Scope            string `json:"scope"`
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+}
+
+type PaginationData struct {
+	First         bool        `json:"first"`
+	Last          bool        `json:"last"`
+	Size          int         `json:"size"`
+	TotalElements int         `json:"totalElements"`
+	PerPage       int         `json:"perPage"`
+	NextPage      interface{} `json:"nextPage"`
+}
+
+const applicationJSONHeader = "application/json"
+
+// returns query params with pagination options.
+func paginationQuery(nextPage interface{}) url.Values {
+	q := url.Values{}
+	q.Set("pageOffset", fmt.Sprintf("%v", nextPage))
+	q.Set("perPage", "50")
+	return q
+}
+
+// CreateBearerToken creates a bearer token for the given username, password, and tenant.
+func CreateBearerToken(ctx context.Context, username, password, tenant string) (string, error) {
+	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("api.%s.luminatesec.com/v1/oauth/token", tenant)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Add("Accept", applicationJSONHeader)
+	req.Header.Add("Content-Type", applicationJSONHeader)
+	req.SetBasicAuth(username, password)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	var res AuthResponse
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", err
+	}
+
+	if res.Error != "" {
+		return "", fmt.Errorf("error creating bearer token. %s: %s", res.Error, res.ErrorDescription)
+	}
+
+	return res.AccessToken, nil
+}
+
+// ListIdentityProviderIds returns a list of identity provider ids.
+func (c *Client) ListIdentityProviderIds(ctx context.Context) ([]string, error) {
+	var providerIds []string
+	providersUrl := fmt.Sprintf("%s/identities/settings/identity-providers", c.baseUrl)
+
+	q := url.Values{}
+	q.Set("includeLocal", "true")
+
+	var res struct {
+		IdPs []IdentityProvider
+	}
+	if err := c.doRequest(ctx, providersUrl, &res, q); err != nil {
+		return nil, err
+	}
+
+	for _, identityProvider := range res.IdPs {
+		providerIds = append(providerIds, identityProvider.ID)
+	}
+
+	return providerIds, nil
+}
+
+// ListUserPerProvider returns a list of users for the given identity provider id.
+func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId string, nextPage interface{}) ([]User, PaginationData, error) {
+	url := fmt.Sprintf("%s/identities/%s/users", c.baseUrl, identityProviderId)
+	var res struct {
+		Content []User `json:"content"`
+		PaginationData
+	}
+
+	q := paginationQuery(nextPage)
+	if err := c.doRequest(ctx, url, &res, q); err != nil {
+		return nil, PaginationData{}, err
+	}
+
+	if !res.Last {
+		return res.Content, res.PaginationData, nil
+	}
+
+	return res.Content, PaginationData{}, nil
+}
+
+// ListAllUsers returns a list of all users for all identity providers.
+func (c *Client) ListAllUsers(ctx context.Context) ([]User, error) {
+	var allUsers []User
+	identityProviders, err := c.ListIdentityProviderIds(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching identity providers: %w", err)
+	}
+	for _, identityProvider := range identityProviders {
+		var nextPage interface{}
+		for {
+			users, paginationData, err := c.ListUsersPerProvider(ctx, identityProvider, nextPage)
+			if err != nil {
+				return nil, fmt.Errorf("error fetching users: %w", err)
+			}
+
+			allUsers = append(allUsers, users...)
+			if paginationData.Last {
+				break
+			}
+			nextPage = paginationData.NextPage
+		}
+	}
+
+	return allUsers, nil
+}
+
+// ListGroups returns a list of groups for the given identity provider id.
+func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId string, nextPage interface{}) ([]Group, PaginationData, error) {
+	url := fmt.Sprintf("%s/identities/%s/groups", c.baseUrl, identityProviderId)
+	var res struct {
+		Content []Group `json:"content"`
+		PaginationData
+	}
+
+	q := paginationQuery(nextPage)
+
+	if err := c.doRequest(ctx, url, &res, q); err != nil {
+		return nil, PaginationData{}, err
+	}
+
+	if !res.Last {
+		return res.Content, res.PaginationData, nil
+	}
+
+	return res.Content, PaginationData{}, nil
+}
+
+// ListAllGroups returns a list of all groups for all identity providers.
+func (c *Client) ListAllGroups(ctx context.Context) ([]Group, error) {
+	var allGroups []Group
+	identityProviders, err := c.ListIdentityProviderIds(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching identity providers: %w", err)
+	}
+	for _, identityProvider := range identityProviders {
+		var nextPage interface{}
+		for {
+			groups, paginationData, err := c.ListGroupsPerProvider(ctx, identityProvider, nextPage)
+			if err != nil {
+				return nil, fmt.Errorf("error fetching groups: %w", err)
+			}
+
+			allGroups = append(allGroups, groups...)
+
+			if paginationData.Last {
+				break
+			}
+
+			nextPage = paginationData.NextPage
+		}
+	}
+
+	return allGroups, nil
+}
+
+// ListGroupUsers returns a list of users for the given identity provider id and group id.
+func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string, groupId string, nextPage interface{}) ([]User, PaginationData, error) {
+	url := fmt.Sprintf("%s/identities/%s/groups/%s/users", c.baseUrl, identityProviderId, groupId)
+	var res struct {
+		Content []User `json:"content"`
+		PaginationData
+	}
+
+	q := paginationQuery(nextPage)
+
+	if err := c.doRequest(ctx, url, &res, q); err != nil {
+		return nil, PaginationData{}, err
+	}
+
+	if !res.Last {
+		return res.Content, res.PaginationData, nil
+	}
+
+	return res.Content, PaginationData{}, nil
+}
+
+func (c *Client) doRequest(ctx context.Context, url string, res interface{}, query url.Values) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	if query != nil {
+		req.URL.RawQuery = query.Encode()
+	}
+
+	req.Header.Add("Accept", applicationJSONHeader)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return err
+	}
+
+	return nil
+}
