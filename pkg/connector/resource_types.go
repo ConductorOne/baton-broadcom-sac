@@ -19,4 +19,8 @@ var (
 		Id:          "account",
 		DisplayName: "Account",
 	}
+	policyResourceType = &v2.ResourceType{
+		Id:          "policy",
+		DisplayName: "Policy",
+	}
 )
