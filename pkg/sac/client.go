@@ -281,7 +281,7 @@ func (c *Client) ListAllPolicies(ctx context.Context) ([]Policy, error) {
 	return allPolicies, nil
 }
 
-// List Policies returns a list of policies.
+// GetPolicy returns a policy by ID.
 func (c *Client) GetPolicy(ctx context.Context, policyId string) (Policy, error) {
 	url := fmt.Sprintf("%s/policies/%s", c.baseUrl, policyId)
 	var res Policy
