@@ -24,8 +24,8 @@ const (
 	group                 = "Group"
 )
 
-func (g *policyBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
-	return g.resourceType
+func (p *policyBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
+	return p.resourceType
 }
 
 func policyResource(policy *sac.Policy, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
@@ -42,12 +42,12 @@ func policyResource(policy *sac.Policy, parentResourceID *v2.ResourceId) (*v2.Re
 	return ret, nil
 }
 
-func (g *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, _ *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, _ *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	if parentResourceID == nil {
 		return nil, "", nil, nil
 	}
 
-	policies, err := g.client.ListAllPolicies(ctx)
+	policies, err := p.client.ListAllPolicies(ctx)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to list policies: %w", err)
 	}
@@ -64,7 +64,7 @@ func (g *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 	return rv, "", nil, nil
 }
 
-func (g *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (p *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	var rv []*v2.Entitlement
 
 	assigmentOptions := []ent.EntitlementOption{
@@ -79,8 +79,8 @@ func (g *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _
 	return rv, "", nil, nil
 }
 
-func (g *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	policy, err := g.client.GetPolicy(ctx, resource.Id.Resource)
+func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+	policy, err := p.client.GetPolicy(ctx, resource.Id.Resource)
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("failed to get policy: %w", err)
 	}
