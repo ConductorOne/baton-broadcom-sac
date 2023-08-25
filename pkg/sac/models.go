@@ -34,3 +34,23 @@ type Account struct {
 	Name string
 	ID   string
 }
+
+type Policy struct {
+	ID                string            `json:"id"`
+	Name              string            `json:"name"`
+	Type              string            `json:"type"`
+	Enabled           bool              `json:"enabled"`
+	CreatedAt         string            `json:"createdAt"`
+	DirectoryEntities []DirectoryEntity `json:"directoryEntities"`
+	PolicyAccess      string            `json:"PolicyAccess"`
+}
+
+// Either User or Group.
+type DirectoryEntity struct {
+	ID                   string `json:"id"`
+	IdentifierInProvider string `json:"identifierInProvider"`
+	IdentityProviderID   string `json:"identityProviderId"`
+	IdentityProviderType string `json:"identityProviderType"`
+	Type                 string `json:"type"`
+	DisplayName          string `json:"displayName"`
+}

@@ -24,6 +24,29 @@ func (g *groupBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return g.resourceType
 }
 
+func baseGroupResource(entity *sac.DirectoryEntity, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+	profile := map[string]interface{}{
+		"group_id":    entity.ID,
+		"group_name":  entity.DisplayName,
+		"provider_id": entity.IdentityProviderID,
+	}
+
+	groupTraitOptions := []rs.GroupTraitOption{rs.WithGroupProfile(profile)}
+
+	ret, err := rs.NewGroupResource(
+		entity.DisplayName,
+		groupResourceType,
+		entity.ID,
+		groupTraitOptions,
+		rs.WithParentResourceID(parentResourceID),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
 func groupResource(group *sac.Group, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"group_id":    group.ID,
