@@ -18,7 +18,7 @@ type Client struct {
 }
 
 func NewClient(httpClient *http.Client, tenant, token string) *Client {
-	baseUrl := fmt.Sprintf("api.%s.luminatesec.com", tenant)
+	baseUrl := fmt.Sprintf("https://api.%s.luminatesec.com", tenant)
 	return &Client{
 		httpClient: httpClient,
 		baseUrl:    baseUrl,

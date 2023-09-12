@@ -12,19 +12,19 @@ import (
 type config struct {
 	cli.BaseConfig `mapstructure:",squash"` // Puts the base config options in the same place as the connector options
 
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-	Tenant   string `mapstructure:"tenant"`
+	SacClientID     string `mapstructure:"sac-client-id"`
+	SacClientSecret string `mapstructure:"sac-client-secret"`
+	Tenant          string `mapstructure:"tenant"`
 }
 
 // validateConfig is run after the configuration is loaded, and should return an error if it isn't valid.
 func validateConfig(ctx context.Context, cfg *config) error {
-	if cfg.Username == "" {
-		return fmt.Errorf("username is missing")
+	if cfg.SacClientID == "" {
+		return fmt.Errorf("client ID is missing")
 	}
 
-	if cfg.Password == "" {
-		return fmt.Errorf("password is missing")
+	if cfg.SacClientSecret == "" {
+		return fmt.Errorf("client secret is missing")
 	}
 
 	if cfg.Tenant == "" {
@@ -34,7 +34,7 @@ func validateConfig(ctx context.Context, cfg *config) error {
 }
 
 func cmdFlags(cmd *cobra.Command) {
-	cmd.PersistentFlags().String("username", "", "Username for your Broadcom SAC instance. ($BATON_USERNAME)")
-	cmd.PersistentFlags().String("password", "", "Password for your Broadcom SAC instance. ($BATON_PASSWORD)")
+	cmd.PersistentFlags().String("sac-client-id", "", "Client ID for your Broadcom SAC instance. ($BATON_SAC_CLIENT_ID)")
+	cmd.PersistentFlags().String("sac-client-secret", "", "Client Secret for your Broadcom SAC instance. ($BATON_SAC_CLIENT_SECRET)")
 	cmd.PersistentFlags().String("tenant", "", "Name of your Broadcom SAC tenant. ($BATON_TENANT)")
 }
