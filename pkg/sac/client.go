@@ -35,21 +35,32 @@ type AuthResponse struct {
 }
 
 type PaginationData struct {
-	First         bool        `json:"first"`
-	Last          bool        `json:"last"`
-	Size          int         `json:"size"`
-	TotalElements int         `json:"totalElements"`
-	PerPage       int         `json:"perPage"`
-	NextPage      interface{} `json:"nextPage"`
+	First            bool        `json:"first"`
+	Last             bool        `json:"last"`
+	Size             int         `json:"size"`
+	TotalElements    int         `json:"totalElements"`
+	PerPage          int         `json:"perPage"`
+	NextPage         interface{} `json:"nextPage"`
+	TotalPages       int         `json:"totalPages"`
+	Number           int         `json:"number"`
+	NumberOfElements int         `json:"numberOfElements"`
 }
 
 const applicationJSONHeader = "application/json"
 
-// returns query params with pagination options.
-func paginationQuery(nextPage interface{}) url.Values {
+// returns query params with pagination options with PageOffset.
+func paginationQueryOffset(nextPage interface{}) url.Values {
 	q := url.Values{}
 	q.Set("pageOffset", fmt.Sprintf("%v", nextPage))
 	q.Set("perPage", "50")
+	return q
+}
+
+// returns query params with pagination options with PageNumber.
+func paginationQueryPages(pageNumber int) url.Values {
+	q := url.Values{}
+	q.Set("page", fmt.Sprintf("%v", pageNumber))
+	q.Set("size", "50")
 	return q
 }
 
@@ -119,7 +130,7 @@ func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId st
 		PaginationData
 	}
 
-	q := paginationQuery(nextPage)
+	q := paginationQueryOffset(nextPage)
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
 	}
@@ -165,7 +176,7 @@ func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId s
 		PaginationData
 	}
 
-	q := paginationQuery(nextPage)
+	q := paginationQueryOffset(nextPage)
 
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
@@ -214,7 +225,7 @@ func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string
 		PaginationData
 	}
 
-	q := paginationQuery(nextPage)
+	q := paginationQueryOffset(nextPage)
 
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
@@ -225,6 +236,61 @@ func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string
 	}
 
 	return res.Content, PaginationData{}, nil
+}
+
+// List Policies returns a list of policies.
+func (c *Client) ListPolicies(ctx context.Context, pageNumber int) ([]Policy, PaginationData, error) {
+	url := fmt.Sprintf("%s/policies", c.baseUrl)
+	var res struct {
+		Content []Policy `json:"content"`
+		PaginationData
+	}
+
+	q := paginationQueryPages(pageNumber)
+
+	if err := c.doRequest(ctx, url, &res, q); err != nil {
+		return nil, PaginationData{}, err
+	}
+
+	if !res.Last {
+		return res.Content, res.PaginationData, nil
+	}
+
+	return res.Content, PaginationData{}, nil
+}
+
+// ListAllPolicies returns a paginated list of all policies.
+func (c *Client) ListAllPolicies(ctx context.Context) ([]Policy, error) {
+	var nextPage int
+	var allPolicies []Policy
+	for {
+		policies, paginationData, err := c.ListPolicies(ctx, nextPage)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching policies: %w", err)
+		}
+
+		allPolicies = append(allPolicies, policies...)
+
+		if paginationData.Last {
+			break
+		}
+
+		nextPage = paginationData.Number + 1
+	}
+
+	return allPolicies, nil
+}
+
+// GetPolicy returns a policy by ID.
+func (c *Client) GetPolicy(ctx context.Context, policyId string) (Policy, error) {
+	url := fmt.Sprintf("%s/policies/%s", c.baseUrl, policyId)
+	var res Policy
+
+	if err := c.doRequest(ctx, url, &res, nil); err != nil {
+		return Policy{}, err
+	}
+
+	return res, nil
 }
 
 func (c *Client) doRequest(ctx context.Context, url string, res interface{}, query url.Values) error {

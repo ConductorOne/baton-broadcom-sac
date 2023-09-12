@@ -41,6 +41,7 @@ func accountResource(tenant string, parentResourceID *v2.ResourceId) (*v2.Resour
 		rs.WithAnnotation(
 			&v2.ChildResourceType{ResourceTypeId: userResourceType.Id},
 			&v2.ChildResourceType{ResourceTypeId: groupResourceType.Id},
+			&v2.ChildResourceType{ResourceTypeId: policyResourceType.Id},
 		),
 	)
 	if err != nil {
