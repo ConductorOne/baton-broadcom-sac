@@ -9,6 +9,7 @@ var (
 		Id:          "user",
 		DisplayName: "User",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
+		Annotations: annotationsForUserResourceType(),
 	}
 	groupResourceType = &v2.ResourceType{
 		Id:          "group",
