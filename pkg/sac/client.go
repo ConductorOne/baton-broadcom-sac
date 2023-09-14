@@ -71,7 +71,7 @@ func CreateBearerToken(ctx context.Context, username, password, tenant string) (
 		return "", err
 	}
 
-	url := fmt.Sprintf("api.%s.luminatesec.com/v1/oauth/token", tenant)
+	url := fmt.Sprintf("https://api.%s.luminatesec.com/v1/oauth/token", tenant)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
 		return "", err
