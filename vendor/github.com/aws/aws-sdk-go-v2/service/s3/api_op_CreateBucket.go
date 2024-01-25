@@ -4,11 +4,13 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	s3cust "github.com/aws/aws-sdk-go-v2/service/s3/internal/customizations"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go/middleware"
+	"github.com/aws/smithy-go/ptr"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
@@ -19,11 +21,12 @@ import (
 // information about bucket naming restrictions, see Bucket naming rules (https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html)
 // . If you want to create an Amazon S3 on Outposts bucket, see Create Bucket (https://docs.aws.amazon.com/AmazonS3/latest/API/API_control_CreateBucket.html)
 // . By default, the bucket is created in the US East (N. Virginia) Region. You can
-// optionally specify a Region in the request body. You might choose a Region to
-// optimize latency, minimize costs, or address regulatory requirements. For
-// example, if you reside in Europe, you will probably find it advantageous to
-// create buckets in the Europe (Ireland) Region. For more information, see
-// Accessing a bucket (https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html#access-bucket-intro)
+// optionally specify a Region in the request body. To constrain the bucket
+// creation to a specific Region, you can use LocationConstraint (https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucketConfiguration.html)
+// condition key. You might choose a Region to optimize latency, minimize costs, or
+// address regulatory requirements. For example, if you reside in Europe, you will
+// probably find it advantageous to create buckets in the Europe (Ireland) Region.
+// For more information, see Accessing a bucket (https://docs.aws.amazon.com/AmazonS3/latest/dev/UsingBucket.html#access-bucket-intro)
 // . If you send your create bucket request to the s3.amazonaws.com endpoint, the
 // request goes to the us-east-1 Region. Accordingly, the signature calculations
 // in Signature Version 4 must use us-east-1 as the Region, even if the location
@@ -119,7 +122,7 @@ type CreateBucketInput struct {
 	GrantWriteACP *string
 
 	// Specifies whether you want S3 Object Lock to be enabled for the new bucket.
-	ObjectLockEnabledForBucket bool
+	ObjectLockEnabledForBucket *bool
 
 	// The container element for object ownership for a bucket's ownership controls.
 	// BucketOwnerPreferred - Objects uploaded to the bucket change ownership to the
@@ -137,6 +140,11 @@ type CreateBucketInput struct {
 	noSmithyDocumentSerde
 }
 
+func (in *CreateBucketInput) bindEndpointParams(p *EndpointParameters) {
+	p.Bucket = in.Bucket
+	p.DisableAccessPoints = ptr.Bool(true)
+}
+
 type CreateBucketOutput struct {
 
 	// A forward slash followed by the name of the bucket.
@@ -149,12 +157,22 @@ type CreateBucketOutput struct {
 }
 
 func (c *Client) addOperationCreateBucketMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsRestxml_serializeOpCreateBucket{}, middleware.After)
 	if err != nil {
 		return err
 	}
 	err = stack.Deserialize.Add(&awsRestxml_deserializeOpCreateBucket{}, middleware.After)
 	if err != nil {
+		return err
+	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "CreateBucket"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
 		return err
 	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
@@ -175,9 +193,6 @@ func (c *Client) addOperationCreateBucketMiddlewares(stack *middleware.Stack, op
 	if err = addRetryMiddlewares(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
-		return err
-	}
 	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
 		return err
 	}
@@ -193,7 +208,7 @@ func (c *Client) addOperationCreateBucketMiddlewares(stack *middleware.Stack, op
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
-	if err = swapWithCustomHTTPSignerMiddleware(stack, options); err != nil {
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
 		return err
 	}
 	if err = addOpCreateBucketValidationMiddleware(stack); err != nil {
@@ -223,14 +238,26 @@ func (c *Client) addOperationCreateBucketMiddlewares(stack *middleware.Stack, op
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addSerializeImmutableHostnameBucketMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (v *CreateBucketInput) bucket() (string, bool) {
+	if v.Bucket == nil {
+		return "", false
+	}
+	return *v.Bucket, true
 }
 
 func newServiceMetadataMiddleware_opCreateBucket(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "s3",
 		OperationName: "CreateBucket",
 	}
 }

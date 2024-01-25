@@ -4,6 +4,7 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	s3cust "github.com/aws/aws-sdk-go-v2/service/s3/internal/customizations"
@@ -75,7 +76,7 @@ type ListObjectVersionsInput struct {
 	// will never contain more. If additional keys satisfy the search criteria, but
 	// were not returned because max-keys was exceeded, the response contains true . To
 	// return the additional keys, see key-marker and version-id-marker .
-	MaxKeys int32
+	MaxKeys *int32
 
 	// Specifies the optional fields that you want returned in the response. Fields
 	// that you do not specify are not returned.
@@ -89,9 +90,11 @@ type ListObjectVersionsInput struct {
 	Prefix *string
 
 	// Confirms that the requester knows that they will be charged for the request.
-	// Bucket owners need not specify this parameter in their requests. For information
-	// about downloading objects from Requester Pays buckets, see Downloading Objects
-	// in Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
+	// Bucket owners need not specify this parameter in their requests. If either the
+	// source or destination Amazon S3 bucket has Requester Pays enabled, the requester
+	// will pay for corresponding charges to copy the object. For information about
+	// downloading objects from Requester Pays buckets, see Downloading Objects in
+	// Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
 	// in the Amazon S3 User Guide.
 	RequestPayer types.RequestPayer
 
@@ -99,6 +102,11 @@ type ListObjectVersionsInput struct {
 	VersionIdMarker *string
 
 	noSmithyDocumentSerde
+}
+
+func (in *ListObjectVersionsInput) bindEndpointParams(p *EndpointParameters) {
+	p.Bucket = in.Bucket
+
 }
 
 type ListObjectVersionsOutput struct {
@@ -128,13 +136,13 @@ type ListObjectVersionsOutput struct {
 	// follow-up paginated request by using the NextKeyMarker and NextVersionIdMarker
 	// response parameters as a starting place in another request to return the rest of
 	// the results.
-	IsTruncated bool
+	IsTruncated *bool
 
 	// Marks the last key returned in a truncated response.
 	KeyMarker *string
 
 	// Specifies the maximum number of objects to return.
-	MaxKeys int32
+	MaxKeys *int32
 
 	// The bucket name.
 	Name *string
@@ -170,12 +178,22 @@ type ListObjectVersionsOutput struct {
 }
 
 func (c *Client) addOperationListObjectVersionsMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsRestxml_serializeOpListObjectVersions{}, middleware.After)
 	if err != nil {
 		return err
 	}
 	err = stack.Deserialize.Add(&awsRestxml_deserializeOpListObjectVersions{}, middleware.After)
 	if err != nil {
+		return err
+	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "ListObjectVersions"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
 		return err
 	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
@@ -196,9 +214,6 @@ func (c *Client) addOperationListObjectVersionsMiddlewares(stack *middleware.Sta
 	if err = addRetryMiddlewares(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
-		return err
-	}
 	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
 		return err
 	}
@@ -214,7 +229,7 @@ func (c *Client) addOperationListObjectVersionsMiddlewares(stack *middleware.Sta
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
-	if err = swapWithCustomHTTPSignerMiddleware(stack, options); err != nil {
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
 		return err
 	}
 	if err = addOpListObjectVersionsValidationMiddleware(stack); err != nil {
@@ -244,14 +259,26 @@ func (c *Client) addOperationListObjectVersionsMiddlewares(stack *middleware.Sta
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addSerializeImmutableHostnameBucketMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (v *ListObjectVersionsInput) bucket() (string, bool) {
+	if v.Bucket == nil {
+		return "", false
+	}
+	return *v.Bucket, true
 }
 
 func newServiceMetadataMiddleware_opListObjectVersions(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "s3",
 		OperationName: "ListObjectVersions",
 	}
 }

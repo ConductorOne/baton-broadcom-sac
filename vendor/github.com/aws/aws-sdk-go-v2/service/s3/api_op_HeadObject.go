@@ -143,7 +143,7 @@ type HeadObjectInput struct {
 	// 10,000. Effectively performs a 'ranged' HEAD request for the part specified.
 	// Useful querying about the size of the part and the number of parts in this
 	// object.
-	PartNumber int32
+	PartNumber *int32
 
 	// HeadObject returns only the metadata for an object. If the Range is
 	// satisfiable, only the ContentLength is affected in the response. If the Range
@@ -151,9 +151,11 @@ type HeadObjectInput struct {
 	Range *string
 
 	// Confirms that the requester knows that they will be charged for the request.
-	// Bucket owners need not specify this parameter in their requests. For information
-	// about downloading objects from Requester Pays buckets, see Downloading Objects
-	// in Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
+	// Bucket owners need not specify this parameter in their requests. If either the
+	// source or destination Amazon S3 bucket has Requester Pays enabled, the requester
+	// will pay for corresponding charges to copy the object. For information about
+	// downloading objects from Requester Pays buckets, see Downloading Objects in
+	// Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
 	// in the Amazon S3 User Guide.
 	RequestPayer types.RequestPayer
 
@@ -179,6 +181,11 @@ type HeadObjectInput struct {
 	noSmithyDocumentSerde
 }
 
+func (in *HeadObjectInput) bindEndpointParams(p *EndpointParameters) {
+	p.Bucket = in.Bucket
+
+}
+
 type HeadObjectOutput struct {
 
 	// Indicates that a range of bytes was specified.
@@ -189,7 +196,7 @@ type HeadObjectOutput struct {
 
 	// Indicates whether the object uses an S3 Bucket Key for server-side encryption
 	// with Key Management Service (KMS) keys (SSE-KMS).
-	BucketKeyEnabled bool
+	BucketKeyEnabled *bool
 
 	// Specifies caching behavior along the request/reply chain.
 	CacheControl *string
@@ -234,14 +241,14 @@ type HeadObjectOutput struct {
 	ContentLanguage *string
 
 	// Size of the body in bytes.
-	ContentLength int64
+	ContentLength *int64
 
 	// A standard MIME type describing the format of the object data.
 	ContentType *string
 
 	// Specifies whether the object retrieved was (true) or was not (false) a Delete
 	// Marker. If false, this response header does not appear in the response.
-	DeleteMarker bool
+	DeleteMarker *bool
 
 	// An entity tag (ETag) is an opaque identifier assigned by a web server to a
 	// specific version of a resource found at a URL.
@@ -268,7 +275,7 @@ type HeadObjectOutput struct {
 	// headers. This can happen if you create metadata using an API like SOAP that
 	// supports more flexible metadata than the REST API. For example, using SOAP, you
 	// can create metadata whose values are not legal HTTP headers.
-	MissingMeta int32
+	MissingMeta *int32
 
 	// Specifies whether a legal hold is in effect for this object. This header is
 	// only returned if the requester has the s3:GetObjectLegalHold permission. This
@@ -289,7 +296,7 @@ type HeadObjectOutput struct {
 
 	// The count of parts this object has. This value is only returned if you specify
 	// partNumber in your request and the object was uploaded as a multipart upload.
-	PartsCount int32
+	PartsCount *int32
 
 	// Amazon S3 can return this header if your request involves a bucket that is
 	// either a source or a destination in a replication rule. In replication, you have
@@ -375,12 +382,22 @@ type HeadObjectOutput struct {
 }
 
 func (c *Client) addOperationHeadObjectMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsRestxml_serializeOpHeadObject{}, middleware.After)
 	if err != nil {
 		return err
 	}
 	err = stack.Deserialize.Add(&awsRestxml_deserializeOpHeadObject{}, middleware.After)
 	if err != nil {
+		return err
+	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "HeadObject"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
 		return err
 	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
@@ -401,9 +418,6 @@ func (c *Client) addOperationHeadObjectMiddlewares(stack *middleware.Stack, opti
 	if err = addRetryMiddlewares(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
-		return err
-	}
 	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
 		return err
 	}
@@ -419,7 +433,7 @@ func (c *Client) addOperationHeadObjectMiddlewares(stack *middleware.Stack, opti
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
-	if err = swapWithCustomHTTPSignerMiddleware(stack, options); err != nil {
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
 		return err
 	}
 	if err = addOpHeadObjectValidationMiddleware(stack); err != nil {
@@ -449,7 +463,20 @@ func (c *Client) addOperationHeadObjectMiddlewares(stack *middleware.Stack, opti
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addSerializeImmutableHostnameBucketMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (v *HeadObjectInput) bucket() (string, bool) {
+	if v.Bucket == nil {
+		return "", false
+	}
+	return *v.Bucket, true
 }
 
 // HeadObjectAPIClient is a client that implements the HeadObject operation.
@@ -766,7 +793,6 @@ func newServiceMetadataMiddleware_opHeadObject(region string) *awsmiddleware.Reg
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "s3",
 		OperationName: "HeadObject",
 	}
 }

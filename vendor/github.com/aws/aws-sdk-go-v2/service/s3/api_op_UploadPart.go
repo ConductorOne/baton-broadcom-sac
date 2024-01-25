@@ -4,6 +4,7 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
@@ -131,7 +132,7 @@ type UploadPartInput struct {
 	// 10,000.
 	//
 	// This member is required.
-	PartNumber int32
+	PartNumber *int32
 
 	// Upload ID identifying the multipart upload whose part is being uploaded.
 	//
@@ -183,7 +184,7 @@ type UploadPartInput struct {
 
 	// Size of the body in bytes. This parameter is useful when the size of the body
 	// cannot be determined automatically.
-	ContentLength int64
+	ContentLength *int64
 
 	// The base64-encoded 128-bit MD5 digest of the part data. This parameter is
 	// auto-populated when using the command from the CLI. This parameter is required
@@ -196,9 +197,11 @@ type UploadPartInput struct {
 	ExpectedBucketOwner *string
 
 	// Confirms that the requester knows that they will be charged for the request.
-	// Bucket owners need not specify this parameter in their requests. For information
-	// about downloading objects from Requester Pays buckets, see Downloading Objects
-	// in Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
+	// Bucket owners need not specify this parameter in their requests. If either the
+	// source or destination Amazon S3 bucket has Requester Pays enabled, the requester
+	// will pay for corresponding charges to copy the object. For information about
+	// downloading objects from Requester Pays buckets, see Downloading Objects in
+	// Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
 	// in the Amazon S3 User Guide.
 	RequestPayer types.RequestPayer
 
@@ -222,11 +225,16 @@ type UploadPartInput struct {
 	noSmithyDocumentSerde
 }
 
+func (in *UploadPartInput) bindEndpointParams(p *EndpointParameters) {
+	p.Bucket = in.Bucket
+
+}
+
 type UploadPartOutput struct {
 
 	// Indicates whether the multipart upload uses an S3 Bucket Key for server-side
 	// encryption with Key Management Service (KMS) keys (SSE-KMS).
-	BucketKeyEnabled bool
+	BucketKeyEnabled *bool
 
 	// The base64-encoded, 32-bit CRC32 checksum of the object. This will only be
 	// present if it was uploaded with the object. With multipart uploads, this may not
@@ -288,12 +296,22 @@ type UploadPartOutput struct {
 }
 
 func (c *Client) addOperationUploadPartMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsRestxml_serializeOpUploadPart{}, middleware.After)
 	if err != nil {
 		return err
 	}
 	err = stack.Deserialize.Add(&awsRestxml_deserializeOpUploadPart{}, middleware.After)
 	if err != nil {
+		return err
+	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "UploadPart"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
 		return err
 	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
@@ -314,9 +332,6 @@ func (c *Client) addOperationUploadPartMiddlewares(stack *middleware.Stack, opti
 	if err = addRetryMiddlewares(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
-		return err
-	}
 	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
 		return err
 	}
@@ -332,7 +347,7 @@ func (c *Client) addOperationUploadPartMiddlewares(stack *middleware.Stack, opti
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
-	if err = swapWithCustomHTTPSignerMiddleware(stack, options); err != nil {
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
 		return err
 	}
 	if err = addOpUploadPartValidationMiddleware(stack); err != nil {
@@ -371,14 +386,26 @@ func (c *Client) addOperationUploadPartMiddlewares(stack *middleware.Stack, opti
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addSerializeImmutableHostnameBucketMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (v *UploadPartInput) bucket() (string, bool) {
+	if v.Bucket == nil {
+		return "", false
+	}
+	return *v.Bucket, true
 }
 
 func newServiceMetadataMiddleware_opUploadPart(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "s3",
 		OperationName: "UploadPart",
 	}
 }

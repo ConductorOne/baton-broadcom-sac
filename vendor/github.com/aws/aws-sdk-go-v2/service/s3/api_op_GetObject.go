@@ -4,6 +4,7 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	internalChecksum "github.com/aws/aws-sdk-go-v2/service/internal/checksum"
@@ -176,7 +177,7 @@ type GetObjectInput struct {
 	// Part number of the object being read. This is a positive integer between 1 and
 	// 10,000. Effectively performs a 'ranged' GET request for the part specified.
 	// Useful for downloading just a part of an object.
-	PartNumber int32
+	PartNumber *int32
 
 	// Downloads the specified range bytes of an object. For more information about
 	// the HTTP Range header, see
@@ -185,9 +186,11 @@ type GetObjectInput struct {
 	Range *string
 
 	// Confirms that the requester knows that they will be charged for the request.
-	// Bucket owners need not specify this parameter in their requests. For information
-	// about downloading objects from Requester Pays buckets, see Downloading Objects
-	// in Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
+	// Bucket owners need not specify this parameter in their requests. If either the
+	// source or destination Amazon S3 bucket has Requester Pays enabled, the requester
+	// will pay for corresponding charges to copy the object. For information about
+	// downloading objects from Requester Pays buckets, see Downloading Objects in
+	// Requester Pays Buckets (https://docs.aws.amazon.com/AmazonS3/latest/dev/ObjectsinRequesterPaysBuckets.html)
 	// in the Amazon S3 User Guide.
 	RequestPayer types.RequestPayer
 
@@ -231,6 +234,11 @@ type GetObjectInput struct {
 	noSmithyDocumentSerde
 }
 
+func (in *GetObjectInput) bindEndpointParams(p *EndpointParameters) {
+	p.Bucket = in.Bucket
+
+}
+
 type GetObjectOutput struct {
 
 	// Indicates that a range of bytes was specified.
@@ -241,7 +249,7 @@ type GetObjectOutput struct {
 
 	// Indicates whether the object uses an S3 Bucket Key for server-side encryption
 	// with Key Management Service (KMS) keys (SSE-KMS).
-	BucketKeyEnabled bool
+	BucketKeyEnabled *bool
 
 	// Specifies caching behavior along the request/reply chain.
 	CacheControl *string
@@ -286,7 +294,7 @@ type GetObjectOutput struct {
 	ContentLanguage *string
 
 	// Size of the body in bytes.
-	ContentLength int64
+	ContentLength *int64
 
 	// The portion of the object returned in the response.
 	ContentRange *string
@@ -296,7 +304,7 @@ type GetObjectOutput struct {
 
 	// Specifies whether the object retrieved was (true) or was not (false) a Delete
 	// Marker. If false, this response header does not appear in the response.
-	DeleteMarker bool
+	DeleteMarker *bool
 
 	// An entity tag (ETag) is an opaque identifier assigned by a web server to a
 	// specific version of a resource found at a URL.
@@ -323,7 +331,7 @@ type GetObjectOutput struct {
 	// headers. This can happen if you create metadata using an API like SOAP that
 	// supports more flexible metadata than the REST API. For example, using SOAP, you
 	// can create metadata whose values are not legal HTTP headers.
-	MissingMeta int32
+	MissingMeta *int32
 
 	// Indicates whether this object has an active legal hold. This field is only
 	// returned if you have permission to view an object's legal hold status.
@@ -337,7 +345,7 @@ type GetObjectOutput struct {
 
 	// The count of parts this object has. This value is only returned if you specify
 	// partNumber in your request and the object was uploaded as a multipart upload.
-	PartsCount int32
+	PartsCount *int32
 
 	// Amazon S3 can return this if your request involves a bucket that is either a
 	// source or destination in a replication rule.
@@ -374,7 +382,7 @@ type GetObjectOutput struct {
 	StorageClass types.StorageClass
 
 	// The number of tags, if any, on the object.
-	TagCount int32
+	TagCount *int32
 
 	// Version of the object.
 	VersionId *string
@@ -391,12 +399,22 @@ type GetObjectOutput struct {
 }
 
 func (c *Client) addOperationGetObjectMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsRestxml_serializeOpGetObject{}, middleware.After)
 	if err != nil {
 		return err
 	}
 	err = stack.Deserialize.Add(&awsRestxml_deserializeOpGetObject{}, middleware.After)
 	if err != nil {
+		return err
+	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "GetObject"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
 		return err
 	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
@@ -417,9 +435,6 @@ func (c *Client) addOperationGetObjectMiddlewares(stack *middleware.Stack, optio
 	if err = addRetryMiddlewares(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
-		return err
-	}
 	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
 		return err
 	}
@@ -432,7 +447,7 @@ func (c *Client) addOperationGetObjectMiddlewares(stack *middleware.Stack, optio
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
-	if err = swapWithCustomHTTPSignerMiddleware(stack, options); err != nil {
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
 		return err
 	}
 	if err = addOpGetObjectValidationMiddleware(stack); err != nil {
@@ -465,14 +480,26 @@ func (c *Client) addOperationGetObjectMiddlewares(stack *middleware.Stack, optio
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addSerializeImmutableHostnameBucketMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (v *GetObjectInput) bucket() (string, bool) {
+	if v.Bucket == nil {
+		return "", false
+	}
+	return *v.Bucket, true
 }
 
 func newServiceMetadataMiddleware_opGetObject(region string) *awsmiddleware.RegisterServiceMetadata {
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "s3",
 		OperationName: "GetObject",
 	}
 }

@@ -18,7 +18,7 @@ type Client struct {
 }
 
 func NewClient(httpClient *http.Client, tenant, token string) *Client {
-	baseUrl := fmt.Sprintf("https://api.%s.luminatesec.com", tenant)
+	baseUrl := fmt.Sprintf("https://api.%s.luminatesec.com/v2", tenant)
 	return &Client{
 		httpClient: httpClient,
 		baseUrl:    baseUrl,
@@ -308,6 +308,10 @@ func (c *Client) doRequest(ctx context.Context, url string, res interface{}, que
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
 	defer resp.Body.Close()
