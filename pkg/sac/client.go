@@ -310,6 +310,10 @@ func (c *Client) doRequest(ctx context.Context, url string, res interface{}, que
 		return err
 	}
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	defer resp.Body.Close()
 
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
