@@ -108,14 +108,12 @@ func (c *Client) ListIdentityProviderIds(ctx context.Context) ([]string, error) 
 	q := url.Values{}
 	q.Set("includeLocal", "true")
 
-	var res struct {
-		IdPs []IdentityProvider
-	}
+	var res []IdentityProvider
 	if err := c.doRequest(ctx, providersUrl, &res, q); err != nil {
 		return nil, err
 	}
 
-	for _, identityProvider := range res.IdPs {
+	for _, identityProvider := range res {
 		providerIds = append(providerIds, identityProvider.ID)
 	}
 
