@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/conductorone/baton-broadcom-sac/pkg/sac"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
-	grant "github.com/conductorone/baton-sdk/pkg/types/grant"
+	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+
+	"github.com/conductorone/baton-broadcom-sac/pkg/sac"
 )
 
 type groupBuilder struct {
@@ -131,7 +132,7 @@ func (g *groupBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken
 	}
 
 	if !paginationData.Last {
-		token, err = bag.NextToken(fmt.Sprintf("%v", paginationData.NextPage))
+		token, err = bag.NextToken(paginationData.NextPage)
 		if err != nil {
 			return nil, "", nil, err
 		}

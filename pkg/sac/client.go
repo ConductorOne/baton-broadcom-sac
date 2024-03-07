@@ -35,23 +35,25 @@ type AuthResponse struct {
 }
 
 type PaginationData struct {
-	First            bool        `json:"first"`
-	Last             bool        `json:"last"`
-	Size             int         `json:"size"`
-	TotalElements    int         `json:"totalElements"`
-	PerPage          int         `json:"perPage"`
-	NextPage         interface{} `json:"nextPage"`
-	TotalPages       int         `json:"totalPages"`
-	Number           int         `json:"number"`
-	NumberOfElements int         `json:"numberOfElements"`
+	First            bool   `json:"first"`
+	Last             bool   `json:"last"`
+	Size             int    `json:"size"`
+	TotalElements    int    `json:"totalElements"`
+	PerPage          int    `json:"perPage"`
+	NextPage         string `json:"nextPage"`
+	TotalPages       int    `json:"totalPages"`
+	Number           int    `json:"number"`
+	NumberOfElements int    `json:"numberOfElements"`
 }
 
 const applicationJSONHeader = "application/json"
 
 // returns query params with pagination options with PageOffset.
-func paginationQueryOffset(nextPage interface{}) url.Values {
+func paginationQueryOffset(nextPage string) url.Values {
 	q := url.Values{}
-	q.Set("pageOffset", fmt.Sprintf("%v", nextPage))
+	if nextPage != "" {
+		q.Set("pageOffset", nextPage)
+	}
 	q.Set("perPage", "50")
 	return q
 }
@@ -100,9 +102,9 @@ func CreateBearerToken(ctx context.Context, username, password, tenant string) (
 	return res.AccessToken, nil
 }
 
-// ListIdentityProviderIds returns a list of identity provider ids.
-func (c *Client) ListIdentityProviderIds(ctx context.Context) ([]string, error) {
-	var providerIds []string
+// ListIdentityProviderIDs returns a list of identity provider ids.
+func (c *Client) ListIdentityProviderIDs(ctx context.Context) ([]string, error) {
+	var providerIDs []string
 	providersUrl := fmt.Sprintf("%s/identities/settings/identity-providers", c.baseUrl)
 
 	q := url.Values{}
@@ -114,14 +116,14 @@ func (c *Client) ListIdentityProviderIds(ctx context.Context) ([]string, error) 
 	}
 
 	for _, identityProvider := range res {
-		providerIds = append(providerIds, identityProvider.ID)
+		providerIDs = append(providerIDs, identityProvider.ID)
 	}
 
-	return providerIds, nil
+	return providerIDs, nil
 }
 
 // ListUserPerProvider returns a list of users for the given identity provider id.
-func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId string, nextPage interface{}) ([]User, PaginationData, error) {
+func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId string, nextPage string) ([]User, PaginationData, error) {
 	url := fmt.Sprintf("%s/identities/%s/users", c.baseUrl, identityProviderId)
 	var res struct {
 		Content []User `json:"content"`
@@ -143,12 +145,12 @@ func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId st
 // ListAllUsers returns a list of all users for all identity providers.
 func (c *Client) ListAllUsers(ctx context.Context) ([]User, error) {
 	var allUsers []User
-	identityProviders, err := c.ListIdentityProviderIds(ctx)
+	identityProviders, err := c.ListIdentityProviderIDs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching identity providers: %w", err)
 	}
 	for _, identityProvider := range identityProviders {
-		var nextPage interface{}
+		var nextPage string
 		for {
 			users, paginationData, err := c.ListUsersPerProvider(ctx, identityProvider, nextPage)
 			if err != nil {
@@ -167,7 +169,7 @@ func (c *Client) ListAllUsers(ctx context.Context) ([]User, error) {
 }
 
 // ListGroups returns a list of groups for the given identity provider id.
-func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId string, nextPage interface{}) ([]Group, PaginationData, error) {
+func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId string, nextPage string) ([]Group, PaginationData, error) {
 	url := fmt.Sprintf("%s/identities/%s/groups", c.baseUrl, identityProviderId)
 	var res struct {
 		Content []Group `json:"content"`
@@ -190,12 +192,12 @@ func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId s
 // ListAllGroups returns a list of all groups for all identity providers.
 func (c *Client) ListAllGroups(ctx context.Context) ([]Group, error) {
 	var allGroups []Group
-	identityProviders, err := c.ListIdentityProviderIds(ctx)
+	identityProviders, err := c.ListIdentityProviderIDs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching identity providers: %w", err)
 	}
 	for _, identityProvider := range identityProviders {
-		var nextPage interface{}
+		var nextPage string
 		for {
 			groups, paginationData, err := c.ListGroupsPerProvider(ctx, identityProvider, nextPage)
 			if err != nil {
@@ -216,7 +218,7 @@ func (c *Client) ListAllGroups(ctx context.Context) ([]Group, error) {
 }
 
 // ListGroupUsers returns a list of users for the given identity provider id and group id.
-func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string, groupId string, nextPage interface{}) ([]User, PaginationData, error) {
+func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string, groupId string, nextPage string) ([]User, PaginationData, error) {
 	url := fmt.Sprintf("%s/identities/%s/groups/%s/users", c.baseUrl, identityProviderId, groupId)
 	var res struct {
 		Content []User `json:"content"`
