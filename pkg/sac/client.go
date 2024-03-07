@@ -49,11 +49,20 @@ type PaginationData struct {
 const applicationJSONHeader = "application/json"
 
 // returns query params with pagination options with PageOffset.
-func paginationQueryOffset(nextPage interface{}) url.Values {
+func paginationQueryOffset(nextPage interface{}) (url.Values, error) {
 	q := url.Values{}
-	q.Set("pageOffset", fmt.Sprintf("%v", nextPage))
+	if nextPage != nil {
+		switch np := nextPage.(type) {
+		case int:
+			q.Set("pageOffset", fmt.Sprintf("%d", np))
+		case string:
+			q.Set("pageOffset", np)
+		default:
+			return nil, fmt.Errorf("unexpected type for nextPage: %v", nextPage)
+		}
+	}
 	q.Set("perPage", "50")
-	return q
+	return q, nil
 }
 
 // returns query params with pagination options with PageNumber.
@@ -128,7 +137,11 @@ func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId st
 		PaginationData
 	}
 
-	q := paginationQueryOffset(nextPage)
+	q, err := paginationQueryOffset(nextPage)
+	if err != nil {
+		return nil, PaginationData{}, err
+	}
+
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
 	}
@@ -174,7 +187,10 @@ func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId s
 		PaginationData
 	}
 
-	q := paginationQueryOffset(nextPage)
+	q, err := paginationQueryOffset(nextPage)
+	if err != nil {
+		return nil, PaginationData{}, err
+	}
 
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
@@ -223,7 +239,10 @@ func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string
 		PaginationData
 	}
 
-	q := paginationQueryOffset(nextPage)
+	q, err := paginationQueryOffset(nextPage)
+	if err != nil {
+		return nil, PaginationData{}, err
+	}
 
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
