@@ -35,34 +35,27 @@ type AuthResponse struct {
 }
 
 type PaginationData struct {
-	First            bool        `json:"first"`
-	Last             bool        `json:"last"`
-	Size             int         `json:"size"`
-	TotalElements    int         `json:"totalElements"`
-	PerPage          int         `json:"perPage"`
-	NextPage         interface{} `json:"nextPage"`
-	TotalPages       int         `json:"totalPages"`
-	Number           int         `json:"number"`
-	NumberOfElements int         `json:"numberOfElements"`
+	First            bool   `json:"first"`
+	Last             bool   `json:"last"`
+	Size             int    `json:"size"`
+	TotalElements    int    `json:"totalElements"`
+	PerPage          int    `json:"perPage"`
+	NextPage         string `json:"nextPage"`
+	TotalPages       int    `json:"totalPages"`
+	Number           int    `json:"number"`
+	NumberOfElements int    `json:"numberOfElements"`
 }
 
 const applicationJSONHeader = "application/json"
 
 // returns query params with pagination options with PageOffset.
-func paginationQueryOffset(nextPage interface{}) (url.Values, error) {
+func paginationQueryOffset(nextPage string) url.Values {
 	q := url.Values{}
-	if nextPage != nil {
-		switch np := nextPage.(type) {
-		case int:
-			q.Set("pageOffset", fmt.Sprintf("%d", np))
-		case string:
-			q.Set("pageOffset", np)
-		default:
-			return nil, fmt.Errorf("unexpected type for nextPage: %v", nextPage)
-		}
+	if nextPage != "" {
+		q.Set("pageOffset", nextPage)
 	}
 	q.Set("perPage", "50")
-	return q, nil
+	return q
 }
 
 // returns query params with pagination options with PageNumber.
@@ -130,18 +123,14 @@ func (c *Client) ListIdentityProviderIds(ctx context.Context) ([]string, error) 
 }
 
 // ListUserPerProvider returns a list of users for the given identity provider id.
-func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId string, nextPage interface{}) ([]User, PaginationData, error) {
+func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId string, nextPage string) ([]User, PaginationData, error) {
 	url := fmt.Sprintf("%s/identities/%s/users", c.baseUrl, identityProviderId)
 	var res struct {
 		Content []User `json:"content"`
 		PaginationData
 	}
 
-	q, err := paginationQueryOffset(nextPage)
-	if err != nil {
-		return nil, PaginationData{}, err
-	}
-
+	q := paginationQueryOffset(nextPage)
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
 	}
@@ -161,7 +150,7 @@ func (c *Client) ListAllUsers(ctx context.Context) ([]User, error) {
 		return nil, fmt.Errorf("error fetching identity providers: %w", err)
 	}
 	for _, identityProvider := range identityProviders {
-		var nextPage interface{}
+		var nextPage string
 		for {
 			users, paginationData, err := c.ListUsersPerProvider(ctx, identityProvider, nextPage)
 			if err != nil {
@@ -180,17 +169,14 @@ func (c *Client) ListAllUsers(ctx context.Context) ([]User, error) {
 }
 
 // ListGroups returns a list of groups for the given identity provider id.
-func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId string, nextPage interface{}) ([]Group, PaginationData, error) {
+func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId string, nextPage string) ([]Group, PaginationData, error) {
 	url := fmt.Sprintf("%s/identities/%s/groups", c.baseUrl, identityProviderId)
 	var res struct {
 		Content []Group `json:"content"`
 		PaginationData
 	}
 
-	q, err := paginationQueryOffset(nextPage)
-	if err != nil {
-		return nil, PaginationData{}, err
-	}
+	q := paginationQueryOffset(nextPage)
 
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
@@ -211,7 +197,7 @@ func (c *Client) ListAllGroups(ctx context.Context) ([]Group, error) {
 		return nil, fmt.Errorf("error fetching identity providers: %w", err)
 	}
 	for _, identityProvider := range identityProviders {
-		var nextPage interface{}
+		var nextPage string
 		for {
 			groups, paginationData, err := c.ListGroupsPerProvider(ctx, identityProvider, nextPage)
 			if err != nil {
@@ -232,17 +218,14 @@ func (c *Client) ListAllGroups(ctx context.Context) ([]Group, error) {
 }
 
 // ListGroupUsers returns a list of users for the given identity provider id and group id.
-func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string, groupId string, nextPage interface{}) ([]User, PaginationData, error) {
+func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string, groupId string, nextPage string) ([]User, PaginationData, error) {
 	url := fmt.Sprintf("%s/identities/%s/groups/%s/users", c.baseUrl, identityProviderId, groupId)
 	var res struct {
 		Content []User `json:"content"`
 		PaginationData
 	}
 
-	q, err := paginationQueryOffset(nextPage)
-	if err != nil {
-		return nil, PaginationData{}, err
-	}
+	q := paginationQueryOffset(nextPage)
 
 	if err := c.doRequest(ctx, url, &res, q); err != nil {
 		return nil, PaginationData{}, err
