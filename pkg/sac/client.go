@@ -102,9 +102,9 @@ func CreateBearerToken(ctx context.Context, username, password, tenant string) (
 	return res.AccessToken, nil
 }
 
-// ListIdentityProviderIds returns a list of identity provider ids.
-func (c *Client) ListIdentityProviderIds(ctx context.Context) ([]string, error) {
-	var providerIds []string
+// ListIdentityProviderIDs returns a list of identity provider ids.
+func (c *Client) ListIdentityProviderIDs(ctx context.Context) ([]string, error) {
+	var providerIDs []string
 	providersUrl := fmt.Sprintf("%s/identities/settings/identity-providers", c.baseUrl)
 
 	q := url.Values{}
@@ -116,10 +116,10 @@ func (c *Client) ListIdentityProviderIds(ctx context.Context) ([]string, error) 
 	}
 
 	for _, identityProvider := range res {
-		providerIds = append(providerIds, identityProvider.ID)
+		providerIDs = append(providerIDs, identityProvider.ID)
 	}
 
-	return providerIds, nil
+	return providerIDs, nil
 }
 
 // ListUserPerProvider returns a list of users for the given identity provider id.
@@ -145,7 +145,7 @@ func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId st
 // ListAllUsers returns a list of all users for all identity providers.
 func (c *Client) ListAllUsers(ctx context.Context) ([]User, error) {
 	var allUsers []User
-	identityProviders, err := c.ListIdentityProviderIds(ctx)
+	identityProviders, err := c.ListIdentityProviderIDs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching identity providers: %w", err)
 	}
@@ -192,7 +192,7 @@ func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId s
 // ListAllGroups returns a list of all groups for all identity providers.
 func (c *Client) ListAllGroups(ctx context.Context) ([]Group, error) {
 	var allGroups []Group
-	identityProviders, err := c.ListIdentityProviderIds(ctx)
+	identityProviders, err := c.ListIdentityProviderIDs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching identity providers: %w", err)
 	}
