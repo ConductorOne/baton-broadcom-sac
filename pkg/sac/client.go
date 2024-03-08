@@ -135,11 +135,7 @@ func (c *Client) ListUsersPerProvider(ctx context.Context, identityProviderId st
 		return nil, PaginationData{}, err
 	}
 
-	if !res.Last {
-		return res.Content, res.PaginationData, nil
-	}
-
-	return res.Content, PaginationData{}, nil
+	return res.Content, res.PaginationData, nil
 }
 
 // ListAllUsers returns a list of all users for all identity providers.
@@ -182,11 +178,7 @@ func (c *Client) ListGroupsPerProvider(ctx context.Context, identityProviderId s
 		return nil, PaginationData{}, err
 	}
 
-	if !res.Last {
-		return res.Content, res.PaginationData, nil
-	}
-
-	return res.Content, PaginationData{}, nil
+	return res.Content, res.PaginationData, nil
 }
 
 // ListAllGroups returns a list of all groups for all identity providers.
@@ -231,11 +223,7 @@ func (c *Client) ListGroupMembers(ctx context.Context, identityProviderId string
 		return nil, PaginationData{}, err
 	}
 
-	if !res.Last {
-		return res.Content, res.PaginationData, nil
-	}
-
-	return res.Content, PaginationData{}, nil
+	return res.Content, res.PaginationData, nil
 }
 
 // List Policies returns a list of policies.
@@ -252,11 +240,7 @@ func (c *Client) ListPolicies(ctx context.Context, pageNumber int) ([]Policy, Pa
 		return nil, PaginationData{}, err
 	}
 
-	if !res.Last {
-		return res.Content, res.PaginationData, nil
-	}
-
-	return res.Content, PaginationData{}, nil
+	return res.Content, res.PaginationData, nil
 }
 
 // ListAllPolicies returns a paginated list of all policies.
