@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	cfg "github.com/conductorone/baton-broadcom-sac/pkg/config"
 	"github.com/conductorone/baton-broadcom-sac/pkg/connector"
-	"github.com/conductorone/baton-sdk/pkg/cli"
+	"github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/connectorrunner"
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -18,15 +20,19 @@ var version = "dev"
 func main() {
 	ctx := context.Background()
 
-	cfg := &config{}
-	cmd, err := cli.NewCmd(ctx, "baton-broadcom-sac", cfg, validateConfig, getConnector)
+	_, cmd, err := config.DefineConfiguration(
+		ctx,
+		"baton-broadcom-sac",
+		getConnector,
+		cfg.Config,
+		connectorrunner.WithDefaultCapabilitiesConnectorBuilder(&connector.Connector{}),
+	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 
 	cmd.Version = version
-	cmdFlags(cmd)
 
 	err = cmd.Execute()
 	if err != nil {
@@ -35,10 +41,13 @@ func main() {
 	}
 }
 
-func getConnector(ctx context.Context, cfg *config) (types.ConnectorServer, error) {
+func getConnector(ctx context.Context, cc *cfg.BroadcomSac) (types.ConnectorServer, error) {
 	l := ctxzap.Extract(ctx)
+	if err := cfg.ValidateConfig(cc); err != nil {
+		return nil, err
+	}
 
-	cb, err := connector.New(ctx, cfg.SacClientID, cfg.SacClientSecret, cfg.Tenant)
+	cb, err := connector.New(ctx, cc.SacClientId, cc.SacClientSecret, cc.Tenant)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
