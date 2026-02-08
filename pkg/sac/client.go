@@ -17,11 +17,13 @@ type Client struct {
 	token      string
 }
 
-func NewClient(httpClient *http.Client, tenant, token string) *Client {
-	baseUrl := fmt.Sprintf("https://api.%s.luminatesec.com/v2", tenant)
+func NewClient(httpClient *http.Client, tenant, token, baseURL string) *Client {
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("https://api.%s.luminatesec.com/v2", tenant)
+	}
 	return &Client{
 		httpClient: httpClient,
-		baseUrl:    baseUrl,
+		baseUrl:    baseURL,
 		token:      token,
 	}
 }
@@ -67,14 +69,17 @@ func paginationQueryPages(pageNumber int) url.Values {
 }
 
 // CreateBearerToken creates a bearer token for the given username, password, and tenant.
-func CreateBearerToken(ctx context.Context, username, password, tenant string) (string, error) {
+func CreateBearerToken(ctx context.Context, username, password, tenant, baseURL string) (string, error) {
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
 		return "", err
 	}
 
-	url := fmt.Sprintf("https://api.%s.luminatesec.com/v1/oauth/token", tenant)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	tokenURL := baseURL
+	if tokenURL == "" {
+		tokenURL = fmt.Sprintf("https://api.%s.luminatesec.com/v1/oauth/token", tenant)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, nil)
 	if err != nil {
 		return "", err
 	}

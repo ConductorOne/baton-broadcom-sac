@@ -47,7 +47,7 @@ func getConnector(ctx context.Context, cc *cfg.BroadcomSac) (types.ConnectorServ
 		return nil, err
 	}
 
-	cb, err := connector.New(ctx, cc.SacClientId, cc.SacClientSecret, cc.Tenant)
+	cb, err := connector.New(ctx, cc.SacClientId, cc.SacClientSecret, cc.Tenant, cc.BaseUrl)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
