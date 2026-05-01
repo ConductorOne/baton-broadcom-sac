@@ -29,6 +29,7 @@ func NewClient(httpClient *http.Client, tenant, token, baseURL string) *Client {
 }
 
 type AuthResponse struct {
+	//nolint:gosec,nolintlint // G117: legitimate field name, not a credential
 	AccessToken      string `json:"access_token"`
 	ExpiresIn        int    `json:"expires_in"`
 	Scope            string `json:"scope"`
@@ -90,7 +91,7 @@ func CreateBearerToken(ctx context.Context, username, password, tenant, baseURL 
 	req.Header.Add("Content-Type", applicationJSONHeader)
 	req.SetBasicAuth(username, password)
 
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec,nolintlint // G704: URL constructed from trusted config
 	if err != nil {
 		return "", err
 	}
@@ -296,7 +297,7 @@ func (c *Client) doRequest(ctx context.Context, url string, res interface{}, que
 
 	req.Header.Add("Accept", applicationJSONHeader)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec,nolintlint // G704: URL constructed from trusted config
 	if err != nil {
 		return err
 	}
