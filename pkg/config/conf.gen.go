@@ -7,6 +7,7 @@ type BroadcomSac struct {
 	SacClientId string `mapstructure:"sac-client-id"`
 	SacClientSecret string `mapstructure:"sac-client-secret"`
 	Tenant string `mapstructure:"tenant"`
+	BaseUrl string `mapstructure:"base-url"`
 }
 
 func (c *BroadcomSac) findFieldByTag(tagValue string) (any, bool) {

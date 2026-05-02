@@ -18,6 +18,7 @@ type Connector struct {
 	clientID     string
 	clientSecret string
 	tenant       string
+	baseURL      string
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
@@ -47,7 +48,7 @@ func (c *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error)
 // Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
 // to be sure that they are valid.
 func (c *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
-	token, err := sac.CreateBearerToken(ctx, c.clientID, c.clientSecret, c.tenant)
+	token, err := sac.CreateBearerToken(ctx, c.clientID, c.clientSecret, c.tenant, c.baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get access token: %w", err)
 	}
@@ -60,21 +61,22 @@ func (c *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, clientID, clientSecret, tenant string) (*Connector, error) {
+func New(ctx context.Context, clientID, clientSecret, tenant, baseURL string) (*Connector, error) {
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
 		return nil, err
 	}
 
-	token, err := sac.CreateBearerToken(ctx, clientID, clientSecret, tenant)
+	token, err := sac.CreateBearerToken(ctx, clientID, clientSecret, tenant, baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get access token: %w", err)
 	}
 
 	return &Connector{
-		client:       sac.NewClient(httpClient, tenant, token),
+		client:       sac.NewClient(httpClient, tenant, token, baseURL),
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		tenant:       tenant,
+		baseURL:      baseURL,
 	}, nil
 }

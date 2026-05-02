@@ -17,16 +17,19 @@ type Client struct {
 	token      string
 }
 
-func NewClient(httpClient *http.Client, tenant, token string) *Client {
-	baseUrl := fmt.Sprintf("https://api.%s.luminatesec.com/v2", tenant)
+func NewClient(httpClient *http.Client, tenant, token, baseURL string) *Client {
+	if baseURL == "" {
+		baseURL = fmt.Sprintf("https://api.%s.luminatesec.com/v2", tenant)
+	}
 	return &Client{
 		httpClient: httpClient,
-		baseUrl:    baseUrl,
+		baseUrl:    baseURL,
 		token:      token,
 	}
 }
 
 type AuthResponse struct {
+	//nolint:gosec,nolintlint // G117: legitimate field name, not a credential
 	AccessToken      string `json:"access_token"`
 	ExpiresIn        int    `json:"expires_in"`
 	Scope            string `json:"scope"`
@@ -67,14 +70,19 @@ func paginationQueryPages(pageNumber int) url.Values {
 }
 
 // CreateBearerToken creates a bearer token for the given username, password, and tenant.
-func CreateBearerToken(ctx context.Context, username, password, tenant string) (string, error) {
+func CreateBearerToken(ctx context.Context, username, password, tenant, baseURL string) (string, error) {
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
 		return "", err
 	}
 
-	url := fmt.Sprintf("https://api.%s.luminatesec.com/v1/oauth/token", tenant)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	var tokenURL string
+	if baseURL != "" {
+		tokenURL = baseURL + "/v1/oauth/token"
+	} else {
+		tokenURL = fmt.Sprintf("https://api.%s.luminatesec.com/v1/oauth/token", tenant)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, tokenURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +91,7 @@ func CreateBearerToken(ctx context.Context, username, password, tenant string) (
 	req.Header.Add("Content-Type", applicationJSONHeader)
 	req.SetBasicAuth(username, password)
 
-	resp, err := httpClient.Do(req)
+	resp, err := httpClient.Do(req) //nolint:gosec,nolintlint // G704: URL constructed from trusted config
 	if err != nil {
 		return "", err
 	}
@@ -289,7 +297,7 @@ func (c *Client) doRequest(ctx context.Context, url string, res interface{}, que
 
 	req.Header.Add("Accept", applicationJSONHeader)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.token))
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) //nolint:gosec,nolintlint // G704: URL constructed from trusted config
 	if err != nil {
 		return err
 	}

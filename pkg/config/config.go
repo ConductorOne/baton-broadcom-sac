@@ -29,6 +29,14 @@ var (
 		field.WithDisplayName("Tenant"),
 	)
 
+	BaseURL = field.StringField(
+		"base-url",
+		field.WithDescription("Override the Broadcom SAC API URL (for testing)"),
+		field.WithDisplayName("Base URL"),
+		field.WithHidden(true),
+		field.WithExportTarget(field.ExportTargetCLIOnly),
+	)
+
 	// FieldRelationships defines relationships between the fields listed in
 	// Config that can be automatically validated.
 	FieldRelationships = []field.SchemaFieldRelationship{}
@@ -39,6 +47,7 @@ var Config = field.NewConfiguration([]field.SchemaField{
 	SacClientId,
 	SacClientSecret,
 	Tenant,
+	BaseURL,
 })
 
 // ValidateConfig is run after the configuration is loaded, and should return an
