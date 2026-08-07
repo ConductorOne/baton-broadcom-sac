@@ -32,13 +32,14 @@ func baseGroupResource(entity *sac.DirectoryEntity, parentResourceID *v2.Resourc
 		"provider_id": entity.IdentityProviderID,
 	}
 
-	groupTraitOptions := []rs.GroupTraitOption{rs.WithGroupProfile(profile)}
+	groupTraitOptions := []rs.GroupTraitOption{}
 
 	ret, err := rs.NewGroupResource(
 		entity.DisplayName,
 		groupResourceType,
 		entity.ID,
 		groupTraitOptions,
+		rs.WithResourceProfile(profile),
 		rs.WithParentResourceID(parentResourceID),
 	)
 	if err != nil {
@@ -55,13 +56,14 @@ func groupResource(group *sac.Group, parentResourceID *v2.ResourceId) (*v2.Resou
 		"provider_id": group.IdentityProviderID,
 	}
 
-	groupTraitOptions := []rs.GroupTraitOption{rs.WithGroupProfile(profile)}
+	groupTraitOptions := []rs.GroupTraitOption{}
 
 	ret, err := rs.NewGroupResource(
 		group.Name,
 		groupResourceType,
 		group.ID,
 		groupTraitOptions,
+		rs.WithResourceProfile(profile),
 		rs.WithParentResourceID(parentResourceID),
 	)
 	if err != nil {
@@ -116,12 +118,7 @@ func (g *groupBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken
 		return nil, "", nil, err
 	}
 
-	groupTrait, err := rs.GetGroupTrait(resource)
-	if err != nil {
-		return nil, "", nil, err
-	}
-
-	identityProviderId, ok := rs.GetProfileStringValue(groupTrait.Profile, "provider_id")
+	identityProviderId, ok := rs.GetProfileStringValue(rs.GetProfile(resource), "provider_id")
 	if !ok {
 		return nil, "", nil, fmt.Errorf("error fetching provider_id from group profile")
 	}

@@ -38,15 +38,14 @@ func baseUserResource(entity *sac.DirectoryEntity, parentResourceID *v2.Resource
 		"identity_provider": entity.IdentityProviderType,
 	}
 
-	userTraitOptions := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
-	}
+	userTraitOptions := []rs.UserTraitOption{}
 
 	ret, err := rs.NewUserResource(
 		entity.DisplayName,
 		userResourceType,
 		entity.ID,
 		userTraitOptions,
+		rs.WithResourceProfile(profile),
 		rs.WithParentResourceID(parentResourceID),
 	)
 
@@ -77,9 +76,7 @@ func userResource(user *sac.User, parentResourceID *v2.ResourceId) (*v2.Resource
 	}
 
 	userTraitOptions := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
 		rs.WithEmail(user.Email, true),
-		rs.WithStatus(userStatus),
 	}
 
 	ret, err := rs.NewUserResource(
@@ -87,6 +84,8 @@ func userResource(user *sac.User, parentResourceID *v2.ResourceId) (*v2.Resource
 		userResourceType,
 		user.ID,
 		userTraitOptions,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(v2.Status_ResourceStatus(userStatus), ""),
 		rs.WithParentResourceID(parentResourceID),
 	)
 
